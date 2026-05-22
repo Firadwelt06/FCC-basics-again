@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive Periodic Table</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text2: #8b949e;
+    --text3: #6e7681;
+    --accent: #58a6ff;
+    --alkali: #f85149;
+    --alkaline: #ffa657;
+    --transition: #d2a8ff;
+    --post: #79c0ff;
+    --metalloid: #56d364;
+    --nonmetal: #3fb950;
+    --halogen: #ff7b72;
+    --noble: #a5d6ff;
+    --lanthanide: #ffa198;
+    --actinide: #ffb77c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+    overflow-x: auto;
+  }
+  header {
+    padding: 18px 24px 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  header h1 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .search-box {
+    flex: 1;
+    min-width: 160px;
+    max-width: 260px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+  }
+  .search-box:focus { border-color: var(--accent); }
+  .filter-wrap {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    transition: opacity 0.15s;
+    opacity: 0.75;
+  }
+  .filter-btn.active { opacity: 1; border-color: rgba(255,255,255,0.3); }
+  .filter-btn:hover { opacity: 1; }
+
+  .main { padding: 12px 16px; }
+  .table-wrap { overflow-x: auto; }
+  
+  .main { padding: 12px 16px; }
+  .table-wrap { overflow-x: auto; }
+  
+  /* Desktop Layout: Scales perfectly to fit the window screen without vertical overflow */
+  .pt-grid {
+    display: grid;
+    grid-template-columns: repeat(18, 5.3vmin);
+    grid-template-rows: repeat(10, 6.8vmin);
+    gap: 0.4vmin;
+    width: max-content;
+    margin: 0 auto;
+  }
+  .cell {
+    width: 5.3vmin;
+    height: 6.8vmin;
+    border-radius: 0.5vmin;
+    border: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.1s, border-color 0.1s, opacity 0.15s;
+    position: relative;
+    padding: 0.4vmin;
+  }
+  .cell:hover { transform: scale(1.15); border-color: rgba(255,255,255,0.5); z-index: 10; }
+  .cell.dimmed { opacity: 0.15; }
+  .cell.highlighted { outline: 2px solid #fff; outline-offset: 1px; }
+  .cell .num { font-size: 1.1vmin; color: rgba(255,255,255,0.5); line-height: 1; margin-bottom: 0.2vmin; }
+  .cell .sym { font-size: 2.3vmin; font-weight: 700; line-height: 1.1; }
+  .cell .name { font-size: 0.85vmin; color: rgba(255,255,255,0.65); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; margin-top: 0.2vmin; }
+  .cell .mass { font-size: 0.85vmin; color: rgba(255,255,255,0.45); margin-top: 0.1vmin; }
+
+  .placeholder { width: 5.3vmin; height: 6.8vmin; }
+
+  .series-label {
+    width: 5.3vmin; height: 6.8vmin;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.95vmin; color: var(--text3); text-align: center; line-height: 1.3;
+  }
+
+  /* Category colors */
+  .alkali-metal       { background: #3d1a1a; color: #ffb3ae; }
+  .alkaline-earth     { background: #3d2a10; color: #ffc87a; }
+  .transition-metal   { background: #2a1f3d; color: #d2a8ff; }
+  .post-transition    { background: #1a2a3d; color: #79c0ff; }
+  .metalloid          { background: #1a3d2a; color: #7ee787; }
+  .nonmetal           { background: #163324; color: #56d364; }
+  .halogen            { background: #3d1f1a; color: #ff9492; }
+  .noble-gas          { background: #1a2d3d; color: #a5d6ff; }
+  .lanthanide         { background: #3d1f1f; color: #ffadad; }
+  .actinide           { background: #3d2b1a; color: #ffbf7a; }
+
+  /* Panel */
+  .panel-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .panel-overlay.open { opacity: 1; pointer-events: all; }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 540px;
+    max-height: 88vh;
+    overflow-y: auto;
+    padding: 24px;
+    transform: translateY(20px);
+    transition: transform 0.2s;
+  }
+  .panel-overlay.open .panel { transform: translateY(0); }
+  .panel-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .big-sym {
+    width: 80px; height: 80px;
+    border-radius: 10px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .big-sym .s { font-size: 36px; font-weight: 700; line-height: 1; }
+  .big-sym .n { font-size: 13px; opacity: 0.7; }
+  .panel-title h2 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .panel-title .cat { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; }
+  .panel-title .z { font-size: 13px; color: var(--text2); margin-top: 4px; }
+  .close-btn {
+    margin-left: auto;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text2);
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+    flex-shrink: 0;
+  }
+  .close-btn:hover { color: var(--text); border-color: var(--text2); }
+
+  .section-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text3);
+    margin-bottom: 8px;
+    margin-top: 18px;
+  }
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .info-card {
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .info-card .label { font-size: 10px; color: var(--text3); margin-bottom: 3px; }
+  .info-card .value { font-size: 14px; font-weight: 600; }
+  .chips {
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+  }
+  .chip.ox { color: #79c0ff; border-color: #1f4070; background: #0d2340; }
+  .chip.isotope { color: #7ee787; border-color: #1a4d2a; background: #0d2819; }
+  .chip.stable { color: #7ee787; }
+  .chip.unstable { color: #ffa657; }
+
+  .ox-detail { margin-top: 4px; font-size: 12px; color: var(--text2); line-height: 1.6; }
+
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 10px; color: var(--text2);
+  }
+  .legend-swatch {
+    width: 14px; height: 14px;
+    border-radius: 3px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .electron-config {
+    font-size: 12px;
+    color: var(--text2);
+    background: var(--surface2);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    word-break: break-all;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚛ Periodic Table</h1>
+  <input class="search-box" id="search" placeholder="Search element, symbol, number…" autocomplete="off"/>
+  <div class="filter-wrap" id="filters"></div>
+</header>
+
+<div class="legend" id="legend"></div>
+
+<div class="main">
+  <div class="table-wrap">
+    <div class="pt-grid" id="grid"></div>
+  </div>
+</div>
+
+<div class="panel-overlay" id="overlay" onclick="handleOverlayClick(event)">
+  <div class="panel" id="panel">
+    <div class="panel-header">
+      <div class="big-sym" id="pd-sym"></div>
+      <div class="panel-title">
+        <h2 id="pd-name"></h2>
+        <div class="cat" id="pd-cat"></div>
+        <div class="z" id="pd-z"></div>
+      </div>
+      <button class="close-btn" onclick="closePanel()">✕ Close</button>
+    </div>
+
+    <div class="section-title">Basic properties</div>
+    <div class="info-grid" id="pd-basic"></div>
+
+    <div class="section-title">Electron configuration</div>
+    <div class="electron-config" id="pd-econf"></div>
+
+    <div class="section-title">Oxidation states</div>
+    <div class="chips" id="pd-ox"></div>
+    <div class="ox-detail" id="pd-ox-detail"></div>
+
+    <div class="section-title">Valency</div>
+    <div class="chips" id="pd-val"></div>
+
+    <div class="section-title">Notable isotopes</div>
+    <div class="chips" id="pd-iso"></div>
+  </div>
+</div>
+
+<script>
+const CATS = {
+  'alkali-metal':     { label: 'Alkali metal',         color: '#f85149' },
+  'alkaline-earth':   { label: 'Alkaline earth',        color: '#ffa657' },
+  'transition-metal': { label: 'Transition metal',      color: '#d2a8ff' },
+  'post-transition':  { label: 'Post-transition metal', color: '#79c0ff' },
+  'metalloid':        { label: 'Metalloid',             color: '#56d364' },
+  'nonmetal':         { label: 'Nonmetal',              color: '#3fb950' },
+  'halogen':          { label: 'Halogen',               color: '#ff7b72' },
+  'noble-gas':        { label: 'Noble gas',             color: '#a5d6ff' },
+  'lanthanide':       { label: 'Lanthanide',            color: '#ffa198' },
+  'actinide':         { label: 'Actinide',              color: '#ffb77c' },
+};
+
+// Elements: [Z, sym, name, mass, category, group, period, ox_states, valency, isotopes, econf, ox_note]
+const E = [
+  [1,'H','Hydrogen',1.008,'nonmetal',1,1,['-1','+1'],['1'],['¹H (stable, 99.98%)','²H deuterium (stable, 0.02%)','³H tritium (β⁻, t½=12.3y)'],'1s¹','Can be +1 (acids) or -1 (hydrides)'],
+  [2,'He','Helium',4.003,'noble-gas',18,1,['0'],['0'],['⁴He (stable, 99.9%)','³He (stable, 0.0001%)'],'1s²','Zero — full valence shell'],
+  [3,'Li','Lithium',6.941,'alkali-metal',1,2,['+1'],[' 1'],['⁶Li (stable)','⁷Li (stable, 92.5%)'],'[He]2s¹','Loses 1 electron readily'],
+  [4,'Be','Beryllium',9.012,'alkaline-earth',2,2,['+2'],['2'],['⁹Be (stable)','¹⁰Be (β⁻, t½=1.39My)'],'[He]2s²','+2 only'],
+  [5,'B','Boron',10.811,'metalloid',13,2,['+3'],['3'],['¹⁰B (stable, 19.9%)','¹¹B (stable, 80.1%)'],'[He]2s²2p¹','+3 in most compounds'],
+  [6,'C','Carbon',12.011,'nonmetal',14,2,['-4','+2','+4'],['2','4'],['¹²C (stable, 98.9%)','¹³C (stable, 1.1%)','¹⁴C (β⁻, t½=5730y)'],'[He]2s²2p²','Wide range; +4 in CO₂, -4 in CH₄'],
+  [7,'N','Nitrogen',14.007,'nonmetal',15,2,['-3','-2','-1','+1','+2','+3','+4','+5'],['1','2','3'],['¹⁴N (stable, 99.6%)','¹⁵N (stable, 0.4%)'],'[He]2s²2p³','-3 in NH₃; +5 in HNO₃'],
+  [8,'O','Oxygen',15.999,'nonmetal',16,2,['-2','-1'],['2'],['¹⁶O (stable, 99.8%)','¹⁷O (stable)','¹⁸O (stable, 0.2%)'],'[He]2s²2p⁴','-2 almost always; -1 in peroxides'],
+  [9,'F','Fluorine',18.998,'halogen',17,2,['-1'],['1'],['¹⁹F (stable, 100%)'],'[He]2s²2p⁵','Most electronegative element — always -1'],
+  [10,'Ne','Neon',20.180,'noble-gas',18,2,['0'],['0'],['²⁰Ne (stable)','²²Ne (stable)'],'[He]2s²2p⁶','Zero'],
+  [11,'Na','Sodium',22.990,'alkali-metal',1,3,['+1'],['1'],['²³Na (stable, 100%)','²²Na (β⁺, t½=2.6y)'],'[Ne]3s¹','+1 in all common compounds'],
+  [12,'Mg','Magnesium',24.305,'alkaline-earth',2,3,['+2'],['2'],['²⁴Mg (stable, 79%)','²⁵Mg (stable)','²⁶Mg (stable)'],'[Ne]3s²','+2 always'],
+  [13,'Al','Aluminium',26.982,'post-transition',13,3,['+3'],['3'],['²⁷Al (stable, 100%)'],'[Ne]3s²3p¹','+3 in all stable compounds'],
+  [14,'Si','Silicon',28.086,'metalloid',14,3,['-4','+2','+4'],['4'],['²⁸Si (stable, 92.2%)','²⁹Si (stable)','³⁰Si (stable)'],'[Ne]3s²3p²','+4 typical; -4 in silicides'],
+  [15,'P','Phosphorus',30.974,'nonmetal',15,3,['-3','+3','+5'],['3','5'],['³¹P (stable, 100%)','³²P (β⁻, t½=14.3d)'],'[Ne]3s²3p³','-3 in PH₃; +5 in H₃PO₄'],
+  [16,'S','Sulfur',32.065,'nonmetal',16,3,['-2','+2','+4','+6'],['2','4','6'],['³²S (stable, 95%)','³⁴S (stable)','³³S (stable)','³⁶S (stable)'],'[Ne]3s²3p⁴','-2 in H₂S; +6 in SO₃/H₂SO₄'],
+  [17,'Cl','Chlorine',35.453,'halogen',17,3,['-1','+1','+3','+5','+7'],['1','3','5','7'],['³⁵Cl (stable, 75.8%)','³⁷Cl (stable, 24.2%)','³⁶Cl (β⁻, t½=301Ky)'],'[Ne]3s²3p⁵','-1 usual; +1 to +7 with O'],
+  [18,'Ar','Argon',39.948,'noble-gas',18,3,['0'],['0'],['⁴⁰Ar (stable, 99.6%)','³⁶Ar (stable)','³⁸Ar (stable)'],'[Ne]3s²3p⁶','Zero'],
+  [19,'K','Potassium',39.098,'alkali-metal',1,4,['+1'],['1'],['³⁹K (stable, 93.3%)','⁴¹K (stable)','⁴⁰K (β⁻/EC, t½=1.25Gy)'],'[Ar]4s¹','+1 in all compounds'],
+  [20,'Ca','Calcium',40.078,'alkaline-earth',2,4,['+2'],['2'],['⁴⁰Ca (stable, 96.9%)','⁴⁴Ca (stable)','⁴⁸Ca (2β, t½=6.4×10¹⁹y)'],'[Ar]4s²','+2 always'],
+  [21,'Sc','Scandium',44.956,'transition-metal',3,4,['+3'],['3'],['⁴⁵Sc (stable, 100%)','⁴⁶Sc (β⁻, t½=83.8d)'],'[Ar]3d¹4s²','+3 only'],
+  [22,'Ti','Titanium',47.867,'transition-metal',4,4,['+2','+3','+4'],['2','3','4'],['⁴⁸Ti (stable, 73.7%)','⁴⁶Ti (stable)','⁴⁷Ti (stable)'],'[Ar]3d²4s²','+4 most common; +2,+3 in some'],
+  [23,'V','Vanadium',50.942,'transition-metal',5,4,['+2','+3','+4','+5'],['2','3','4','5'],['⁵¹V (stable, 99.7%)','⁵⁰V (β⁻, t½=1.4×10¹⁷y)'],'[Ar]3d³4s²','+5 most common (VO₄³⁻)'],
+  [24,'Cr','Chromium',51.996,'transition-metal',6,4,['+2','+3','+6'],['2','3','6'],['⁵²Cr (stable, 83.8%)','⁵⁰Cr (stable)','⁵³Cr (stable)'],'[Ar]3d⁵4s¹','+3 most stable; +6 toxic/oxidising'],
+  [25,'Mn','Manganese',54.938,'transition-metal',7,4,['+2','+3','+4','+6','+7'],['2','3','4'],['⁵⁵Mn (stable, 100%)','⁵⁴Mn (EC, t½=312d)'],'[Ar]3d⁵4s²','+2 aqueous; +7 in permanganate'],
+  [26,'Fe','Iron',55.845,'transition-metal',8,4,['+2','+3'],['2','3'],['⁵⁶Fe (stable, 91.7%)','⁵⁴Fe (stable)','⁵⁷Fe (stable)','⁵⁸Fe (stable)'],'[Ar]3d⁶4s²','+2 (ferrous) and +3 (ferric) common'],
+  [27,'Co','Cobalt',58.933,'transition-metal',9,4,['+2','+3'],['2','3'],['⁵⁹Co (stable, 100%)','⁶⁰Co (β⁻, t½=5.27y)'],'[Ar]3d⁷4s²','+2 usual; +3 in complexes'],
+  [28,'Ni','Nickel',58.693,'transition-metal',10,4,['+2'],['2'],['⁵⁸Ni (stable, 68.1%)','⁶⁰Ni (stable)','⁶⁴Ni (stable)'],'[Ar]3d⁸4s²','+2 dominant'],
+  [29,'Cu','Copper',63.546,'transition-metal',11,4,['+1','+2'],['1','2'],['⁶³Cu (stable, 69.2%)','⁶⁵Cu (stable, 30.8%)'],'[Ar]3d¹⁰4s¹','+2 more common; +1 in Cu₂O'],
+  [30,'Zn','Zinc',65.38,'post-transition',12,4,['+2'],['2'],['⁶⁴Zn (stable, 48.6%)','⁶⁶Zn (stable)','⁶⁸Zn (stable)'],'[Ar]3d¹⁰4s²','+2 only'],
+  [31,'Ga','Gallium',69.723,'post-transition',13,4,['+3'],['3'],['⁶⁹Ga (stable, 60.1%)','⁷¹Ga (stable, 39.9%)'],'[Ar]3d¹⁰4s²4p¹','+3 predominant'],
+  [32,'Ge','Germanium',72.630,'metalloid',14,4,['+2','+4'],['4'],['⁷⁴Ge (stable, 36.3%)','⁷²Ge (stable)','⁷⁰Ge (stable)'],'[Ar]3d¹⁰4s²4p²','+4 usual; +2 also known'],
+  [33,'As','Arsenic',74.922,'metalloid',15,4,['-3','+3','+5'],['3','5'],['⁷⁵As (stable, 100%)','⁷³As (EC, t½=80.3d)'],'[Ar]3d¹⁰4s²4p³','-3 in arsenides; +3,+5 with O'],
+  [34,'Se','Selenium',78.971,'nonmetal',16,4,['-2','+4','+6'],['2','4','6'],['⁷⁸Se (stable, 23.8%)','⁸⁰Se (stable, 49.6%)','⁷⁶Se (stable)'],'[Ar]3d¹⁰4s²4p⁴','-2 typical; +4/+6 with O'],
+  [35,'Br','Bromine',79.904,'halogen',17,4,['-1','+1','+3','+5'],['1','3','5'],['⁷⁹Br (stable, 50.7%)','⁸¹Br (stable, 49.3%)'],'[Ar]3d¹⁰4s²4p⁵','-1 most common; higher with O'],
+  [36,'Kr','Krypton',83.798,'noble-gas',18,4,['0','+2'],['0','2'],['⁸⁴Kr (stable, 57%)','⁸⁶Kr (stable)','⁸²Kr (stable)'],'[Ar]3d¹⁰4s²4p⁶','Zero usual; +2 in rare KrF₂'],
+  [37,'Rb','Rubidium',85.468,'alkali-metal',1,5,['+1'],['1'],['⁸⁵Rb (stable, 72.2%)','⁸⁷Rb (β⁻, t½=49.9Gy)'],'[Kr]5s¹','+1 only'],
+  [38,'Sr','Strontium',87.62,'alkaline-earth',2,5,['+2'],['2'],['⁸⁸Sr (stable, 82.6%)','⁸⁶Sr (stable)','⁸⁷Sr (stable)','⁹⁰Sr (β⁻, t½=28.8y)'],'[Kr]5s²','+2 always'],
+  [39,'Y','Yttrium',88.906,'transition-metal',3,5,['+3'],['3'],['⁸⁹Y (stable, 100%)','⁹⁰Y (β⁻, t½=64h)'],'[Kr]4d¹5s²','+3 only'],
+  [40,'Zr','Zirconium',91.224,'transition-metal',4,5,['+4'],['4'],['⁹⁰Zr (stable, 51.5%)','⁹²Zr (stable)','⁹⁴Zr (stable)'],'[Kr]4d²5s²','+4 predominant'],
+  [41,'Nb','Niobium',92.906,'transition-metal',5,5,['+3','+5'],['3','5'],['⁹³Nb (stable, 100%)'],'[Kr]4d⁴5s¹','+5 most common'],
+  [42,'Mo','Molybdenum',95.95,'transition-metal',6,5,['+2','+3','+4','+6'],['2','3','4','6'],['⁹⁸Mo (stable, 24.1%)','⁹⁶Mo (stable)','⁹⁵Mo (stable)'],'[Kr]4d⁵5s¹','+6 in MoO₃; +4/+2 also known'],
+  [43,'Tc','Technetium',97,'transition-metal',7,5,['+4','+7'],['4','7'],['⁹⁹Tc (β⁻, t½=211Ky)','⁹⁷Tc (EC, t½=4.21My)'],'[Kr]4d⁵5s²','No stable isotopes'],
+  [44,'Ru','Ruthenium',101.07,'transition-metal',8,5,['+2','+3','+4'],['2','3','4'],['¹⁰²Ru (stable, 31.6%)','¹⁰⁴Ru (stable)','¹⁰¹Ru (stable)'],'[Kr]4d⁷5s¹','+2 to +4 common'],
+  [45,'Rh','Rhodium',102.91,'transition-metal',9,5,['+3'],['3'],['¹⁰³Rh (stable, 100%)'],'[Kr]4d⁸5s¹','+3 dominant'],
+  [46,'Pd','Palladium',106.42,'transition-metal',10,5,['+2'],['2'],['¹⁰⁸Pd (stable, 26.5%)','¹⁰⁶Pd (stable)','¹⁰⁵Pd (stable)'],'[Kr]4d¹⁰','+2 most common'],
+  [47,'Ag','Silver',107.87,'transition-metal',11,5,['+1'],['1'],['¹⁰⁷Ag (stable, 51.8%)','¹⁰⁹Ag (stable, 48.2%)'],'[Kr]4d¹⁰5s¹','+1 only in stable compounds'],
+  [48,'Cd','Cadmium',112.41,'post-transition',12,5,['+2'],['2'],['¹¹⁴Cd (stable, 28.7%)','¹¹²Cd (stable)','¹¹⁰Cd (stable)'],'[Kr]4d¹⁰5s²','+2 only'],
+  [49,'In','Indium',114.82,'post-transition',13,5,['+3'],['3'],['¹¹⁵In (β⁻, t½=4.4×10¹⁴y, ~95.7%)','¹¹³In (stable, 4.3%)'],'[Kr]4d¹⁰5s²5p¹','+3 dominant'],
+  [50,'Sn','Tin',118.71,'post-transition',14,5,['+2','+4'],['2','4'],['¹²⁰Sn (stable, 32.6%)','¹¹⁸Sn (stable)','¹¹⁶Sn (stable)'],'[Kr]4d¹⁰5s²5p²','+4 in SnO₂; +2 in SnCl₂'],
+  [51,'Sb','Antimony',121.76,'metalloid',15,5,['-3','+3','+5'],['3','5'],['¹²¹Sb (stable, 57.2%)','¹²³Sb (stable, 42.8%)'],'[Kr]4d¹⁰5s²5p³','+3/+5 both common'],
+  [52,'Te','Tellurium',127.6,'metalloid',16,5,['-2','+4','+6'],['2','4','6'],['¹³⁰Te (2β, t½=7.9×10²⁰y, 34.1%)','¹²⁸Te (stable, 31.7%)','¹²⁶Te (stable)'],'[Kr]4d¹⁰5s²5p⁴','-2 in tellurides; +4/+6 with O'],
+  [53,'I','Iodine',126.90,'halogen',17,5,['-1','+1','+3','+5','+7'],['1','3','5','7'],['¹²⁷I (stable, 100%)','¹²⁹I (β⁻, t½=15.7My)','¹³¹I (β⁻, t½=8d)'],'[Kr]4d¹⁰5s²5p⁵','-1 most stable; +5 in IO₃⁻'],
+  [54,'Xe','Xenon',131.29,'noble-gas',18,5,['0','+2','+4','+6','+8'],['0','2','4','6'],['¹³²Xe (stable, 26.9%)','¹³¹Xe (stable, 21.2%)','¹³⁴Xe (stable)'],'[Kr]4d¹⁰5s²5p⁶','Rare: +2,+4,+6 in fluorides'],
+  [55,'Cs','Caesium',132.91,'alkali-metal',1,6,['+1'],['1'],['¹³³Cs (stable, 100%)','¹³⁷Cs (β⁻, t½=30.1y)'],'[Xe]6s¹','+1 only'],
+  [56,'Ba','Barium',137.33,'alkaline-earth',2,6,['+2'],['2'],['¹³⁸Ba (stable, 71.7%)','¹³⁷Ba (stable)','¹³⁶Ba (stable)'],'[Xe]6s²','+2 always'],
+  [57,'La','Lanthanum',138.91,'lanthanide',3,6,['+3'],['3'],['¹³⁹La (stable, 99.9%)','¹³⁸La (β⁻/EC, t½=105Gy)'],'[Xe]5d¹6s²','+3 only'],
+  [58,'Ce','Cerium',140.12,'lanthanide',null,6,['+3','+4'],['3','4'],['¹⁴⁰Ce (stable, 88.5%)','¹³⁸Ce (stable)','¹³⁶Ce (stable)'],'[Xe]4f¹5d¹6s²','+3 most stable; +4 in CeO₂'],
+  [59,'Pr','Praseodymium',140.91,'lanthanide',null,6,['+3'],['3'],['¹⁴¹Pr (stable, 100%)'],'[Xe]4f³6s²','+3 only'],
+  [60,'Nd','Neodymium',144.24,'lanthanide',null,6,['+3'],['3'],['¹⁴²Nd (stable, 27.2%)','¹⁴⁴Nd (α, t½=2.3×10¹⁵y, 23.8%)','¹⁴⁶Nd (stable)'],'[Xe]4f⁴6s²','+3 only'],
+  [61,'Pm','Promethium',145,'lanthanide',null,6,['+3'],['3'],['¹⁴⁵Pm (EC/α, t½=17.7y)','¹⁴⁷Pm (β⁻, t½=2.62y)'],'[Xe]4f⁵6s²','No stable isotopes (synthetic)'],
+  [62,'Sm','Samarium',150.36,'lanthanide',null,6,['+3'],['3'],['¹⁵²Sm (stable, 26.7%)','¹⁵⁴Sm (stable, 22.7%)','¹⁴⁷Sm (α, t½=107Gy)'],'[Xe]4f⁶6s²','+3 predominant'],
+  [63,'Eu','Europium',151.96,'lanthanide',null,6,['+2','+3'],['2','3'],['¹⁵³Eu (stable, 52.2%)','¹⁵¹Eu (stable, 47.8%)'],'[Xe]4f⁷6s²','+3 usual; +2 also stable'],
+  [64,'Gd','Gadolinium',157.25,'lanthanide',null,6,['+3'],['3'],['¹⁵⁸Gd (stable, 24.8%)','¹⁶⁰Gd (stable, 21.9%)','¹⁵⁶Gd (stable)'],'[Xe]4f⁷5d¹6s²','+3 only'],
+  [65,'Tb','Terbium',158.93,'lanthanide',null,6,['+3'],['3'],['¹⁵⁹Tb (stable, 100%)'],'[Xe]4f⁹6s²','+3 predominant'],
+  [66,'Dy','Dysprosium',162.50,'lanthanide',null,6,['+3'],['3'],['¹⁶⁴Dy (stable, 28.2%)','¹⁶²Dy (stable, 25.5%)','¹⁶³Dy (stable)'],'[Xe]4f¹⁰6s²','+3 only'],
+  [67,'Ho','Holmium',164.93,'lanthanide',null,6,['+3'],['3'],['¹⁶⁵Ho (stable, 100%)'],'[Xe]4f¹¹6s²','+3 only'],
+  [68,'Er','Erbium',167.26,'lanthanide',null,6,['+3'],['3'],['¹⁶⁶Er (stable, 33.5%)','¹⁶⁸Er (stable, 26.9%)','¹⁶⁷Er (stable)'],'[Xe]4f¹²6s²','+3 only'],
+  [69,'Tm','Thulium',168.93,'lanthanide',null,6,['+3'],['3'],['¹⁶⁹Tm (stable, 100%)'],'[Xe]4f¹³6s²','+3 predominant; +2 rare'],
+  [70,'Yb','Ytterbium',173.05,'lanthanide',null,6,['+2','+3'],['2','3'],['¹⁷⁴Yb (stable, 31.8%)','¹⁷²Yb (stable, 21.8%)','¹⁷³Yb (stable)'],'[Xe]4f¹⁴6s²','+3 usual; +2 stable'],
+  [71,'Lu','Lutetium',174.97,'lanthanide',3,6,['+3'],['3'],['¹⁷⁵Lu (stable, 97.4%)','¹⁷⁶Lu (β⁻, t½=37.6Gy)'],'[Xe]4f¹⁴5d¹6s²','+3 only'],
+  [72,'Hf','Hafnium',178.49,'transition-metal',4,6,['+4'],['4'],['¹⁸⁰Hf (stable, 35.1%)','¹⁷⁸Hf (stable, 27.3%)','¹⁷⁷Hf (stable)'],'[Xe]4f¹⁴5d²6s²','+4 predominant'],
+  [73,'Ta','Tantalum',180.95,'transition-metal',5,6,['+5'],['5'],['¹⁸¹Ta (stable, 99.99%)','¹⁸⁰Ta (β⁻/EC, t½>10¹⁵y)'],'[Xe]4f¹⁴5d³6s²','+5 only'],
+  [74,'W','Tungsten',183.84,'transition-metal',6,6,['+2','+3','+4','+6'],['2','4','6'],['¹⁸⁴W (stable, 30.7%)','¹⁸⁶W (stable, 28.6%)','¹⁸²W (stable)'],'[Xe]4f¹⁴5d⁴6s²','+6 most stable (WO₃)'],
+  [75,'Re','Rhenium',186.21,'transition-metal',7,6,['+4','+7'],['4','7'],['¹⁸⁷Re (β⁻, t½=41.6Gy, 62.6%)','¹⁸⁵Re (stable, 37.4%)'],'[Xe]4f¹⁴5d⁵6s²','+7 in Re₂O₇; +4 also common'],
+  [76,'Os','Osmium',190.23,'transition-metal',8,6,['+2','+3','+4','+8'],['2','3','4','8'],['¹⁹²Os (stable, 40.9%)','¹⁹⁰Os (stable, 26.3%)','¹⁸⁸Os (stable)'],'[Xe]4f¹⁴5d⁶6s²','+4 and +8 (OsO₄) common'],
+  [77,'Ir','Iridium',192.22,'transition-metal',9,6,['+3','+4'],['3','4'],['¹⁹³Ir (stable, 62.7%)','¹⁹¹Ir (stable, 37.3%)'],'[Xe]4f¹⁴5d⁷6s²','+3 and +4 both stable'],
+  [78,'Pt','Platinum',195.08,'transition-metal',10,6,['+2','+4'],['2','4'],['¹⁹⁵Pt (stable, 33.8%)','¹⁹⁴Pt (stable, 32.9%)','¹⁹⁶Pt (stable)'],'[Xe]4f¹⁴5d⁹6s¹','+2 most common; +4 also'],
+  [79,'Au','Gold',196.97,'transition-metal',11,6,['+1','+3'],['1','3'],['¹⁹⁷Au (stable, 100%)'],'[Xe]4f¹⁴5d¹⁰6s¹','+3 in AuCl₃; +1 in AuCl'],
+  [80,'Hg','Mercury',200.59,'post-transition',12,6,['+1','+2'],['1','2'],['²⁰²Hg (stable, 29.9%)','²⁰⁰Hg (stable, 23.1%)','¹⁹⁸Hg (stable)'],'[Xe]4f¹⁴5d¹⁰6s²','+2 most common; +1 in Hg₂²⁺'],
+  [81,'Tl','Thallium',204.38,'post-transition',13,6,['+1','+3'],['1','3'],['²⁰⁵Tl (stable, 70.5%)','²⁰³Tl (stable, 29.5%)'],'[Xe]4f¹⁴5d¹⁰6s²6p¹','+1 and +3 both stable'],
+  [82,'Pb','Lead',207.2,'post-transition',14,6,['+2','+4'],['2','4'],['²⁰⁸Pb (stable, 52.4%)','²⁰⁶Pb (stable, 24.1%)','²⁰⁷Pb (stable)'],'[Xe]4f¹⁴5d¹⁰6s²6p²','+2 more common; +4 in PbO₂'],
+  [83,'Bi','Bismuth',208.98,'post-transition',15,6,['+3'],['3'],['²⁰⁹Bi (α, t½=1.9×10¹⁹y, ~100%)'],'[Xe]4f¹⁴5d¹⁰6s²6p³','+3 predominant; technically radioactive'],
+  [84,'Po','Polonium',209,'metalloid',16,6,['-2','+2','+4'],['2','4'],['²¹⁰Po (α, t½=138.4d)','²⁰⁹Po (α, t½=102y)'],'[Xe]4f¹⁴5d¹⁰6s²6p⁴','No stable isotopes'],
+  [85,'At','Astatine',210,'halogen',17,6,['-1','+1','+3','+5'],['1','3','5'],['²¹⁰At (α, t½=8.1h)','²¹¹At (EC/α, t½=7.2h)'],'[Xe]4f¹⁴5d¹⁰6s²6p⁵','No stable isotopes (rarest natural element)'],
+  [86,'Rn','Radon',222,'noble-gas',18,6,['0'],['0'],['²²²Rn (α, t½=3.82d)','²²⁰Rn (α, t½=55.6s)'],'[Xe]4f¹⁴5d¹⁰6s²6p⁶','No stable isotopes'],
+  [87,'Fr','Francium',223,'alkali-metal',1,7,['+1'],['1'],['²²³Fr (β⁻/α, t½=22min)'],'[Rn]7s¹','No stable isotopes (most unstable natural element)'],
+  [88,'Ra','Radium',226,'alkaline-earth',2,7,['+2'],['2'],['²²⁶Ra (α, t½=1600y)','²²⁸Ra (β⁻, t½=5.75y)'],'[Rn]7s²','No stable isotopes'],
+  [89,'Ac','Actinium',227,'actinide',3,7,['+3'],['3'],['²²⁷Ac (β⁻/α, t½=21.8y)','²²⁸Ac (β⁻, t½=6.15h)'],'[Rn]6d¹7s²','No stable isotopes'],
+  [90,'Th','Thorium',232.04,'actinide',null,7,['+4'],['4'],['²³²Th (α, t½=14.1Gy, ~100%)','²³⁰Th (α, t½=75.4Ky)'],'[Rn]6d²7s²','+4 only'],
+  [91,'Pa','Protactinium',231.04,'actinide',null,7,['+5'],['5'],['²³¹Pa (α, t½=32.8Ky)','²³³Pa (β⁻, t½=27d)'],'[Rn]5f²6d¹7s²','+5 most stable'],
+  [92,'U','Uranium',238.03,'actinide',null,7,['+4','+6'],['4','6'],['²³⁸U (α, t½=4.47Gy, 99.3%)','²³⁵U (α, t½=703My, 0.72%)','²³⁴U (α, t½=245Ky)'],'[Rn]5f³6d¹7s²','+6 in UO₂²⁺; +4 in UO₂'],
+  [93,'Np','Neptunium',237,'actinide',null,7,['+5'],['5'],['²³⁷Np (α, t½=2.14My)','²³⁶Np (EC/β⁻, t½=154Ky)'],'[Rn]5f⁴6d¹7s²','+5 most stable'],
+  [94,'Pu','Plutonium',244,'actinide',null,7,['+3','+4','+5','+6'],['3','4','5','6'],['²³⁹Pu (α, t½=24.1Ky)','²⁴⁰Pu (α, t½=6561y)','²³⁸Pu (α, t½=87.7y)'],'[Rn]5f⁶7s²','+4 most stable in water'],
+  [95,'Am','Americium',243,'actinide',null,7,['+3','+5'],['3','5'],['²⁴³Am (α, t½=7370y)','²⁴¹Am (α, t½=432y)'],'[Rn]5f⁷7s²','+3 most stable; +5 also known'],
+  [96,'Cm','Curium',247,'actinide',null,7,['+3'],['3'],['²⁴⁷Cm (α, t½=15.6My)','²⁴⁸Cm (α, t½=340Ky)'],'[Rn]5f⁷6d¹7s²','+3 only'],
+  [97,'Bk','Berkelium',247,'actinide',null,7,['+3'],['3'],['²⁴⁹Bk (β⁻, t½=330d)','²⁴⁷Bk (α, t½=1380y)'],'[Rn]5f⁹7s²','+3 predominant'],
+  [98,'Cf','Californium',251,'actinide',null,7,['+3'],['3'],['²⁵²Cf (α, t½=2.64y)','²⁴⁹Cf (α, t½=351y)'],'[Rn]5f¹⁰7s²','+3 only'],
+  [99,'Es','Einsteinium',252,'actinide',null,7,['+3'],['3'],['²⁵²Es (α/EC, t½=471.7d)','²⁵³Es (α, t½=20.5d)'],'[Rn]5f¹¹7s²','+3 only'],
+  [100,'Fm','Fermium',257,'actinide',null,7,['+3'],['3'],['²⁵⁷Fm (α/SF, t½=100.5d)'],'[Rn]5f¹²7s²','+3 only'],
+  [101,'Md','Mendelevium',258,'actinide',null,7,['+3'],['3'],['²⁵⁸Md (α, t½=51.5d)'],'[Rn]5f¹³7s²','+3 only'],
+  [102,'No','Nobelium',259,'actinide',null,7,['+2','+3'],['2','3'],['²⁵⁹No (α, t½=58min)'],'[Rn]5f¹⁴7s²','+2 more stable than usual for actinides'],
+  [103,'Lr','Lawrencium',266,'actinide',3,7,['+3'],['3'],['²⁶²Lr (α, t½=3.6h)'],'[Rn]5f¹⁴7s²7p¹','+3 only'],
+  [104,'Rf','Rutherfordium',267,'transition-metal',4,7,['+4'],['4'],['²⁶⁷Rf (SF, t½=1.3h)'],'[Rn]5f¹⁴6d²7s²','+4 predicted/observed'],
+  [105,'Db','Dubnium',268,'transition-metal',5,7,['+5'],['5'],['²⁶⁸Db (SF/α, t½=29h)'],'[Rn]5f¹⁴6d³7s²','+5 expected'],
+  [106,'Sg','Seaborgium',269,'transition-metal',6,7,['+6'],['6'],['²⁶⁹Sg (α, t½=14min)'],'[Rn]5f¹⁴6d⁴7s²','+6 expected'],
+  [107,'Bh','Bohrium',270,'transition-metal',7,7,['+7'],['7'],['²⁷⁰Bh (α, t½=61s)'],'[Rn]5f¹⁴6d⁵7s²','+7 expected'],
+  [108,'Hs','Hassium',277,'transition-metal',8,7,['+8'],['8'],['²⁷⁰Hs (α, t½=10s)'],'[Rn]5f¹⁴6d⁶7s²','+8 expected'],
+  [109,'Mt','Meitnerium',278,'transition-metal',9,7,['unknown'],['unknown'],['²⁷⁸Mt (α, t½=7.6s)'],'[Rn]5f¹⁴6d⁷7s²','Too unstable to characterize'],
+  [110,'Ds','Darmstadtium',281,'transition-metal',10,7,['unknown'],['unknown'],['²⁸¹Ds (α/SF, t½=11s)'],'[Rn]5f¹⁴6d⁸7s²','Too unstable to characterize'],
+  [111,'Rg','Roentgenium',282,'transition-metal',11,7,['unknown'],['unknown'],['²⁸²Rg (α, t½=100s)'],'[Rn]5f¹⁴6d¹⁰7s¹','Too unstable to characterize'],
+  [112,'Cn','Copernicium',285,'post-transition',12,7,['unknown'],['unknown'],['²⁸⁵Cn (α, t½=30s)'],'[Rn]5f¹⁴6d¹⁰7s²','Too unstable to characterize'],
+  [113,'Nh','Nihonium',286,'post-transition',13,7,['unknown'],['unknown'],['²⁸⁶Nh (α, t½=9.5s)'],'[Rn]5f¹⁴6d¹⁰7s²7p¹','Too unstable to characterize'],
+  [114,'Fl','Flerovium',289,'post-transition',14,7,['unknown'],['unknown'],['²⁸⁹Fl (α, t½=2.1s)'],'[Rn]5f¹⁴6d¹⁰7s²7p²','Too unstable to characterize'],
+  [115,'Mc','Moscovium',290,'post-transition',15,7,['unknown'],['unknown'],['²⁹⁰Mc (α, t½=650ms)'],'[Rn]5f¹⁴6d¹⁰7s²7p³','Too unstable to characterize'],
+  [116,'Lv','Livermorium',293,'post-transition',16,7,['unknown'],['unknown'],['²⁹³Lv (α, t½=61ms)'],'[Rn]5f¹⁴6d¹⁰7s²7p⁴','Too unstable to characterize'],
+  [117,'Ts','Tennessine',294,'halogen',17,7,['unknown'],['unknown'],['²⁹⁴Ts (α, t½=51ms)'],'[Rn]5f¹⁴6d¹⁰7s²7p⁵','Too unstable to characterize'],
+  [118,'Og','Oganesson',294,'noble-gas',18,7,['unknown'],['unknown'],['²⁹⁴Og (α, t½=0.7ms)'],'[Rn]5f¹⁴6d¹⁰7s²7p⁶','Too unstable to characterize'],
+];
+
+// Build element map by Z
+const byZ = {};
+E.forEach(el => {
+  const [Z,sym,name,mass,cat,grp,per,ox,val,iso,econf,oxNote] = el;
+  byZ[Z] = {Z,sym,name,mass,cat,grp,per,ox,val,iso,econf,oxNote};
+});
+
+// Grid position: [Z, col, row] (1-indexed)
+function getPos(el) {
+  const {Z,grp,per,cat} = el;
+  if (grp && per && cat !== 'lanthanide' && cat !== 'actinide') {
+    return [grp, per];
+  }
+  if (cat === 'lanthanide') {
+    const lnOrder = [57,58,59,60,61,62,63,64,65,66,67,68,69,70,71];
+    const idx = lnOrder.indexOf(Z);
+    return [idx + 4, 9];
+  }
+  if (cat === 'actinide') {
+    const acOrder = [89,90,91,92,93,94,95,96,97,98,99,100,101,102,103];
+    const idx = acOrder.indexOf(Z);
+    return [idx + 4, 10];
+  }
+}
+
+function buildGrid() {
+  const grid = document.getElementById('grid');
+  // 18 cols, 10 rows
+  const cells = {};
+  Object.values(byZ).forEach(el => {
+    const pos = getPos(el);
+    if (pos) cells[`${pos[0]},${pos[1]}`] = el;
+  });
+
+  for (let row = 1; row <= 10; row++) {
+    for (let col = 1; col <= 18; col++) {
+      const key = `${col},${row}`;
+      const el = cells[key];
+      if (el) {
+        const div = document.createElement('div');
+        div.className = `cell ${el.cat}`;
+        div.dataset.z = el.Z;
+        div.innerHTML = `<span class="num">${el.Z}</span><span class="sym">${el.sym}</span><span class="name">${el.name}</span><span class="mass">${parseFloat(el.mass).toFixed(el.mass < 100 ? 2 : 1)}</span>`;
+        div.addEventListener('click', () => openPanel(el.Z));
+        grid.appendChild(div);
+      } else if (row === 6 && col === 3) {
+        // La series label
+        const d = document.createElement('div');
+        d.className = 'series-label lanthanide';
+        d.innerHTML = '57–71<br>Ln';
+        grid.appendChild(d);
+      } else if (row === 7 && col === 3) {
+        const d = document.createElement('div');
+        d.className = 'series-label actinide';
+        d.innerHTML = '89–103<br>Ac';
+        grid.appendChild(d);
+      } else if (row === 9 && col === 1) {
+        const d = document.createElement('div');
+        d.className = 'series-label lanthanide';
+        d.innerHTML = 'Lanthanides';
+        grid.appendChild(d);
+      } else if (row === 10 && col === 1) {
+        const d = document.createElement('div');
+        d.className = 'series-label actinide';
+        d.innerHTML = 'Actinides';
+        grid.appendChild(d);
+      } else if (row === 9 && col === 2) {
+        const d = document.createElement('div');
+        d.className = 'series-label';
+        d.innerHTML = '';
+        grid.appendChild(d);
+      } else if (row === 10 && col === 2) {
+        const d = document.createElement('div');
+        d.className = 'series-label';
+        d.innerHTML = '';
+        grid.appendChild(d);
+      } else {
+        const d = document.createElement('div');
+        d.className = 'placeholder';
+        grid.appendChild(d);
+      }
+    }
+  }
+}
+
+function buildLegend() {
+  const leg = document.getElementById('legend');
+  Object.entries(CATS).forEach(([key, val]) => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.style.cursor = 'pointer';
+    item.dataset.cat = key;
+    item.innerHTML = `<div class="legend-swatch ${key}"></div><span>${val.label}</span>`;
+    item.addEventListener('click', () => filterCat(key, item));
+    leg.appendChild(item);
+  });
+}
+
+let activeFilter = null;
+function filterCat(cat, btn) {
+  if (activeFilter === cat) {
+    activeFilter = null;
+    document.querySelectorAll('.cell').forEach(c => c.classList.remove('dimmed','highlighted'));
+    document.querySelectorAll('.legend-item').forEach(i => i.style.fontWeight = '');
+  } else {
+    activeFilter = cat;
+    document.querySelectorAll('.cell').forEach(c => {
+      const el = byZ[c.dataset.z];
+      if (!el) return;
+      if (el.cat === cat) { c.classList.remove('dimmed'); c.classList.add('highlighted'); }
+      else { c.classList.add('dimmed'); c.classList.remove('highlighted'); }
+    });
+    document.querySelectorAll('.legend-item').forEach(i => {
+      i.style.fontWeight = (i.dataset.cat === cat) ? '700' : '';
+    });
+  }
+}
+
+let searchActive = false;
+document.getElementById('search').addEventListener('input', function() {
+  const q = this.value.trim().toLowerCase();
+  if (!q) {
+    searchActive = false;
+    document.querySelectorAll('.cell').forEach(c => { c.classList.remove('dimmed','highlighted'); });
+    return;
+  }
+  searchActive = true;
+  activeFilter = null;
+  document.querySelectorAll('.legend-item').forEach(i => i.style.fontWeight = '');
+  document.querySelectorAll('.cell').forEach(c => {
+    const el = byZ[c.dataset.z];
+    if (!el) return;
+    const match = el.name.toLowerCase().includes(q) || el.sym.toLowerCase().includes(q) || String(el.Z).includes(q);
+    if (match) { c.classList.remove('dimmed'); c.classList.add('highlighted'); }
+    else { c.classList.add('dimmed'); c.classList.remove('highlighted'); }
+  });
+});
+
+function openPanel(z) {
+  const el = byZ[z];
+  const sym = document.getElementById('pd-sym');
+  sym.className = `big-sym ${el.cat}`;
+  sym.innerHTML = `<span class="s">${el.sym}</span><span class="n">${el.Z}</span>`;
+  document.getElementById('pd-name').textContent = el.name;
+  document.getElementById('pd-cat').textContent = CATS[el.cat]?.label || el.cat;
+  document.getElementById('pd-z').textContent = `Atomic number: ${el.Z} · Atomic mass: ${el.mass} u`;
+
+  document.getElementById('pd-basic').innerHTML = `
+    <div class="info-card"><div class="label">Period</div><div class="value">${el.per}</div></div>
+    <div class="info-card"><div class="label">Group</div><div class="value">${el.grp || '—'}</div></div>
+    <div class="info-card"><div class="label">Atomic mass</div><div class="value">${el.mass} u</div></div>
+    <div class="info-card"><div class="label">Category</div><div class="value" style="font-size:12px">${CATS[el.cat]?.label || el.cat}</div></div>
+  `;
+
+  document.getElementById('pd-econf').textContent = el.econf;
+
+  const oxDiv = document.getElementById('pd-ox');
+  oxDiv.innerHTML = el.ox.map(o => `<span class="chip ox">${o}</span>`).join('');
+  document.getElementById('pd-ox-detail').textContent = el.oxNote;
+
+  const valDiv = document.getElementById('pd-val');
+  valDiv.innerHTML = el.val.map(v => `<span class="chip">${v}</span>`).join('');
+
+  const isoDiv = document.getElementById('pd-iso');
+  const hasStable = el.iso.some(i => i.includes('stable'));
+  isoDiv.innerHTML = el.iso.map(i => {
+    const stable = i.toLowerCase().includes('stable');
+    return `<span class="chip isotope ${stable ? 'stable' : 'unstable'}">${i}</span>`;
+  }).join('');
+
+  document.getElementById('overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closePanel() {
+  document.getElementById('overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('overlay')) closePanel();
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+
+buildGrid();
+buildLegend();
+</script>
+</body>
+</html>
